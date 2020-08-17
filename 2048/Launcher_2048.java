@@ -1,4 +1,3 @@
-
 //coded by Jason Lin
 
 import java.awt.*;
@@ -26,13 +25,18 @@ public class Launcher_2048 {
 	}
 }
 
-class GameCode extends JPanel implements KeyListener, Runnable {
+class GameCode extends JPanel implements KeyListener, Runnable, ActionListener {
 
 	Rectangle back; // background
 	ArrayList<Square> box; //
 	Square logo; // 2048 icon in top left
-	boolean move, over; // move- tracks if move was made after key press, over- tracks if game over
+	// move- tracks if move was made after key press
+	// midmove- tracks if move has already started
+	// over- tracks if game over
+	// direction of movement
+	boolean move, midmove, over, left, right, up, down; 
 	int score; // tracks score
+	Timer time; //ingame timer
 
 	public void init() {
 		back = new Rectangle(25, 225, 600, 600);
@@ -42,7 +46,11 @@ class GameCode extends JPanel implements KeyListener, Runnable {
 		score = 0;
 
 		over = false;
-		move = false;
+		move = midmove = false;
+		left = right = up = down = false;
+
+		time = new Timer(3, this);
+		time.start();
 
 		this.addKeyListener(this);
 		setSize(650, 900);
@@ -63,17 +71,24 @@ class GameCode extends JPanel implements KeyListener, Runnable {
 		Graphics2D g2 = (Graphics2D) g;
 		g.setColor(Color.DARK_GRAY);
 		g2.fill(back); // fill background
+		g.setColor(Color.GRAY);
+		for (int i = 0; i < 4; i++) { // draw background gray squares
+			for (int k = 0; k < 4; k++) {
+				g.fillRect(148 * k + 33, 148 * i + 233, 140, 140);
+			}
+		}
 		g.setFont(new Font("TimesRoman", Font.BOLD, 50));
 		for (int k = 0; k < 16; k++) {
 			g.setColor(box.get(k).getColor()); // get color of each square
-			g2.fill(box.get(k).getRect());
+			if(box.get(k).getVal()!= 0) //only draw square if value is not 0
+				g2.fill(box.get(k).getRect());
 			if (box.get(k).getVal() != 0) {
 				if (box.get(k).getVal() >= 8) // change color of text to be legible
 					g.setColor(Color.WHITE);
 				else
 					g.setColor(Color.BLACK);
-				g.drawString(((Integer) box.get(k).getVal()).toString(), // display value of tiles at a centered
-																			// location
+				// display value of tile at a centered location
+				g.drawString(((Integer) box.get(k).getVal()).toString(),
 						box.get(k).getX() + 70 - ((Integer) box.get(k).getVal()).toString().length() * 13,
 						box.get(k).getY() + 85);
 			}
@@ -153,127 +168,143 @@ class GameCode extends JPanel implements KeyListener, Runnable {
 		}
 	}
 
-	public void left() {
-		for (int i = 0; i < 4; i++) { // iterate the 4 rows
-			for (int x = 0; x < 4; x++) { // repeat each row 4 times to ensure everything hits left wall
-				int k = i * 4; // iterate left to right for each row
-				while (k < (i + 1) * 4 - 1) { // while k is in the same row
-					// if the box exists, has the same value as box to the right, and both have the
-					// same value, combine
-					if (box.get(k).getVal() != 0 && box.get(k).combine && box.get(k + 1).combine
-							&& box.get(k + 1).getVal() == box.get(k).getVal()) {
-						box.get(k).setVal(box.get(k).getVal() * 2); // double left box value
-						box.get(k + 1).setVal(0); // set right box to 0
-						box.get(k).combine = false; // set left box to be unable to combine again in the same move
-						move = true; // detect that a move has been made
-						score += box.get(k).getVal(); // add value to score
+	public void update() {
+		move = false; //first assume no motion occurs, affects if new block is spawned at end of update method
+		if (left) { 
+			for(int row = 0; row < 4; row++) { //iterate through rows
+				for(int tile = row*4+1; tile < row*4+4; tile++) { //iterate through each tile of row
+					//if the space to the left is empty, move left
+					if((box.get(tile-1).getVal() == 0 && box.get(tile).getVal() != 0)) { 
+						move = true; //motion has occured
+						midmove = true;
+						//if the tile has moved far enough left to enter the next square, transfer value and "combined status" to next square
+						if(box.get(tile).getX() <= 148 * (tile%4-1) + 33) {
+							box.get(tile).setX(148 * (tile%4) + 33);
+							box.get(tile-1).setVal(box.get(tile).getVal());
+							box.get(tile).setVal(0);
+							box.get(tile-1).combined = box.get(tile).combined;
+							box.get(tile).combined = false;
+						}
+						//if the tile has not moved far enough to enter the next square, keep moving left
+						else box.get(tile).setX(box.get(tile).getX() - 15);
 					}
-					k++;
-				}
-
-				while (k > i * 4) { // if the box to the left has a value of 0, move box over to the left
-					if (box.get(k).getVal() != 0 && box.get(k - 1).getVal() == 0) {
-						box.get(k - 1).setVal((box.get(k)).getVal()); // set left box value to right box value
-						box.get(k).setVal(0); // set right box to 0
-						move = true; //detect a move has been made
+					//if the square to the left has the same value and has not combined yet, combine values with left
+					else if(box.get(tile).getVal() != 0 && box.get(tile).getVal() == box.get(tile-1).getVal() && !box.get(tile-1).combined && !box.get(tile).combined) {
+						move = true; //motion has occured
+						midmove = true;
+						box.get(tile).setX(box.get(tile).getX() - 15); //move left
+						//once box has moved far enough left to enter the next square, combine values into one square and reset other
+						if(box.get(tile).getX() <= 148 * (tile%4-1) + 33) {
+							box.get(tile).setX(148 * (tile%4) + 33);
+							box.get(tile-1).setVal(box.get(tile).getVal()*2);
+							box.get(tile-1).combined = true; //track that this square has been combined during this move, cannot combine again
+							box.get(tile).setVal(0);
+						}
 					}
-					k--;
 				}
-				repaint();
 			}
 		}
-		if (move) //if any tile moved, spawn a new block
-			newBlock();
-	}
-
-	public void right() { // same logic
-		for (int i = 0; i < 4; i++) {
-			for (int x = 0; x < 4; x++) {
-				int k = 4 * (i + 1) - 1;
-				while (k > i * 4) {
-					if (box.get(k).getVal() != 0 && box.get(k).combine && box.get(k - 1).combine
-							&& box.get(k - 1).getVal() == box.get(k).getVal()) {
-						box.get(k).setVal(box.get(k).getVal() * 2);
-						box.get(k - 1).setVal(0);
-						box.get(k).combine = false;
+		if (right) { //same logic, reversed
+			for(int row = 0; row < 4; row++) {
+				for(int tile = row*4+2; tile >= row*4; tile--) {
+					if((box.get(tile+1).getVal() == 0 && box.get(tile).getVal() != 0)) {
 						move = true;
-						score += box.get(k).getVal();
+						midmove = true;
+						if(box.get(tile).getX() >= 148 * (tile%4+1) + 33) {
+							box.get(tile).setX(148 * (tile%4) + 33);
+							box.get(tile+1).setVal(box.get(tile).getVal());
+							box.get(tile+1).combined = box.get(tile).combined;
+							box.get(tile).combined = false;
+							box.get(tile).setVal(0);
+						}
+						else box.get(tile).setX(box.get(tile).getX() + 15);
 					}
-					k -= 1;
-				}
-				while (k < (i + 1) * 4 - 1) {
-					if (box.get(k).getVal() != 0 && box.get(k + 1).getVal() == 0) {
-						box.get(k + 1).setVal((box.get(k)).getVal());
-						box.get(k).setVal(0);
+					else if(box.get(tile).getVal() != 0 && box.get(tile).getVal() == box.get(tile+1).getVal() && !box.get(tile+1).combined && !box.get(tile).combined) {
 						move = true;
+						midmove = true;
+						box.get(tile).setX(box.get(tile).getX() + 15);
+						if(box.get(tile).getX() >= 148 * (tile%4+1) + 33) {
+							box.get(tile).setX(148 * (tile%4) + 33);
+							box.get(tile+1).setVal(box.get(tile).getVal()*2);
+							box.get(tile+1).combined = true;
+							box.get(tile).setVal(0);
+						}
 					}
-					k += 1;
 				}
-				repaint();
 			}
 		}
-		if (move)
-			newBlock();
-	}
-
-	public void up() { // same logic
-		for (int i = 0; i < 4; i++) {
-			for (int x = 0; x < 4; x++) {
-				int k = i;
-				while (k < 12) {
-					if (box.get(k).getVal() != 0 && box.get(k).combine && box.get(k + 4).combine
-							&& box.get(k + 4).getVal() == box.get(k).getVal()) {
-						box.get(k).setVal(box.get(k).getVal() * 2);
-						box.get(k + 4).setVal(0);
-						box.get(k).combine = false;
+		if (up) { //same logic, vertical
+			for(int row = 1; row < 4; row++) {
+				for(int tile = row*4; tile < row*4+4; tile++) {
+					if((box.get(tile-4).getVal() == 0 && box.get(tile).getVal() != 0)) {
 						move = true;
-						score += box.get(k).getVal();
+						midmove = true;
+						if(box.get(tile).getY() <= 148 * (tile/4-1) + 233) {
+							box.get(tile).setY(148 * (tile/4) + 233);
+							box.get(tile-4).setVal(box.get(tile).getVal());
+							box.get(tile).setVal(0);
+							box.get(tile-4).combined = box.get(tile).combined;
+							box.get(tile).combined = false;
+						}
+						else box.get(tile).setY(box.get(tile).getY() - 15);
 					}
-					k += 4;
-				}
-				while (k > 3) {
-					if (box.get(k).getVal() != 0 && box.get(k - 4).getVal() == 0) {
-						box.get(k - 4).setVal((box.get(k)).getVal());
-						box.get(k).setVal(0);
+					else if(box.get(tile).getVal() != 0 && box.get(tile).getVal() == box.get(tile-4).getVal()&& !box.get(tile-4).combined && !box.get(tile).combined) {
 						move = true;
+						midmove = true;
+						box.get(tile).setY(box.get(tile).getY() - 15);
+						if(box.get(tile).getY() <= 148 * (tile/4-1) + 233) {
+							box.get(tile).setY(148 * (tile/4) + 233);
+							box.get(tile-4).setVal(box.get(tile).getVal()*2);
+							box.get(tile-4).combined = true;
+							box.get(tile).setVal(0);
+						}
 					}
-					k -= 4;
 				}
-				repaint();
 			}
 		}
-		if (move)
-			newBlock();
-	}
-
-	public void down() { // same logic
-		for (int i = 0; i < 4; i++) {
-			for (int x = 0; x < 4; x++) {
-				int k = 15 - i;
-				while (k > 3) {
-					if (box.get(k).getVal() != 0 && box.get(k).combine && box.get(k - 4).combine
-							&& box.get(k - 4).getVal() == box.get(k).getVal()) {
-						box.get(k).setVal(box.get(k).getVal() * 2);
-						box.get(k - 4).setVal(0);
-						box.get(k).combine = false;
+		if (down) { //same logic, vertical and reversed
+			for(int row = 2; row >= 0; row--) {
+				for(int tile = row*4; tile < row*4+4; tile++) {
+					if((box.get(tile+4).getVal() == 0 && box.get(tile).getVal() != 0)) {
 						move = true;
-						score += box.get(k).getVal();
+						midmove = true;
+						if(box.get(tile).getY() >= 148 * (tile/4+1) + 233) {
+							box.get(tile).setY(148 * (tile/4) + 233);
+							box.get(tile+4).setVal(box.get(tile).getVal());
+							box.get(tile).setVal(0);
+							box.get(tile+4).combined = box.get(tile).combined;
+							box.get(tile).combined = false;
+						}
+						else box.get(tile).setY(box.get(tile).getY() + 15);
 					}
-					k -= 4;
-				}
-				while (k < 12) {
-					if (box.get(k).getVal() != 0 && box.get(k + 4).getVal() == 0) {
-						box.get(k + 4).setVal((box.get(k)).getVal());
-						box.get(k).setVal(0);
+					else if(box.get(tile).getVal() != 0 && box.get(tile).getVal() == box.get(tile+4).getVal()&& !box.get(tile+4).combined && !box.get(tile).combined) {
 						move = true;
+						midmove = true;
+						box.get(tile).setY(box.get(tile).getY() + 15);
+						if(box.get(tile).getY() >= 148 * (tile/4+1) + 233) {
+							box.get(tile).setY(148 * (tile/4) + 233);
+							box.get(tile+4).setVal(box.get(tile).getVal()*2);
+							box.get(tile+4).combined = true;
+							box.get(tile).setVal(0);
+						}
 					}
-					k += 4;
 				}
-				repaint();
 			}
+			
 		}
-		if (move)
+		if(midmove && !move) { //if a move finished, spawn new block and set direction to none
 			newBlock();
+			left = right = up = down = false;
+			midmove = false;
+			//reset "combine status" to "uncombined"
+			for (int k = 0; k < 16; k++)
+				box.get(k).combined = false;
+		} else if (!move) { //if no move occurred, set direction to none (do not spawn new block as no move was made)
+			left = right = up = down = false;
+			//reset "combine status" to "uncombined"
+			for (int k = 0; k < 16; k++)
+				box.get(k).combined = false;
+		}
 	}
 
 	@Override
@@ -282,29 +313,27 @@ class GameCode extends JPanel implements KeyListener, Runnable {
 
 	@Override
 	public void keyPressed(KeyEvent e) {
-
-		move = false; // reset boolean detecting if move was made on key press
-		for (int k = 0; k < 16; k++)
-			box.get(k).combine = true; // all tiles are available to be combined (no tiles have yet been combined)
-		switch (e.getKeyCode()) {
-		case 37: // left
-			left();
-			break;
-		case 38: // up
-			up();
-			break;
-		case 39: // right
-			right();
-			break;
-		case 40: // down
-			down();
-			break;
-		default:
-			if (over) // restart if key pressed after death
-				init();
-			break;
+		//if no move is currently in progress, detect arrow key presses
+		if (!left && !right && !up && !down) {
+			switch (e.getKeyCode()) {
+			case 37: // left
+				left = true;
+				break;
+			case 38: // up
+				up = true;
+				break;
+			case 39: // right
+				right = true;
+				break;
+			case 40: // down
+				down = true;
+				break;
+			default:
+				if (over)
+					init();
+				break;
+			}
 		}
-
 	}
 
 	@Override
@@ -313,23 +342,32 @@ class GameCode extends JPanel implements KeyListener, Runnable {
 
 	@Override
 	public void run() {
+
+	}
+
+	@Override
+	public void actionPerformed(ActionEvent arg0) {
+		//ingame timer causes updates and repaints
+		update();
+		repaint();
 	}
 }
 
-// class for separate tiles
+
+//class for separate tiles
 class Square {
 
 	private Rectangle sq;
 	private int x, y, val; // position and value of tile
 	private Color c; // color of tile
-	public boolean combine; // true if tile is available to combine (if it has not been combined yet)
+	public boolean combined; //"combine status" detects if a square has already been combined that move
 
 	public Square(int x1, int y1, int s1) {
 		x = x1;
 		y = y1;
 		sq = new Rectangle(x1, y1, s1, s1);
 		val = 0;
-		combine = true;
+		combined = false;
 	}
 
 	// return color of the tile depending on the value
@@ -389,6 +427,16 @@ class Square {
 		return y;
 	}
 
+	public void setX(int xVal) {
+		sq.x = xVal;
+		x = xVal;
+	}
+
+	public void setY(int yVal) {
+		sq.y = yVal;
+		y = yVal;
+	}
+	
 	public Rectangle getRect() {
 		return sq;
 	}
