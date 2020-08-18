@@ -358,13 +358,11 @@ class GameCode extends JPanel implements KeyListener, Runnable, ActionListener {
 class Square {
 
 	private Rectangle sq;
-	private int x, y, val; // position and value of tile
+	private int val; // position and value of tile
 	private Color c; // color of tile
 	public boolean combined; //"combine status" detects if a square has already been combined that move
 
 	public Square(int x1, int y1, int s1) {
-		x = x1;
-		y = y1;
 		sq = new Rectangle(x1, y1, s1, s1);
 		val = 0;
 		combined = false;
@@ -420,21 +418,19 @@ class Square {
 	}
 
 	public int getX() {
-		return x;
+		return sq.x;
 	}
 
 	public int getY() {
-		return y;
+		return sq.y;
 	}
 
 	public void setX(int xVal) {
 		sq.x = xVal;
-		x = xVal;
 	}
 
 	public void setY(int yVal) {
 		sq.y = yVal;
-		y = yVal;
 	}
 	
 	public Rectangle getRect() {
