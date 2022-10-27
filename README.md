@@ -1,4 +1,6 @@
 # coding-portfolio
+NOTE: Code not updated since highschool
+
 All projects are coded by Jason Lin in Java. For each project, .java files are included with source code, and .jar files are downloadable to run the code. To run .jar files, the computer must be running at least JRE 8 (Java version 1.8.0).
 
 GAME CONTROLS:
